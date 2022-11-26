@@ -1,0 +1,32 @@
+source ./env
+
+echo -e
+echo -e "----------------------"
+echo -e "Creating Multipass VMs"
+echo -e "----------------------"
+echo -e
+sudo date
+echo -e
+
+echo -e "Creating Master VM k8s-master:"
+multipass launch --name k8s-master --network en0 --cpus 4 --disk 20G --mem 8G
+multipass stop k8s-master
+sleep 10
+sudo vboxmanage modifyvm "k8s-master" --nic2 hostonlynet --host-only-net2 "KubernetesNetwork"
+sleep 10
+multipass start k8s-master
+
+
+for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
+do 
+    NODE_NAME="k8s-node${w}"
+    echo -e "Creating Worker VM ${NODE_NAME}:"
+    multipass launch --name $NODE_NAME --network en0 --cpus 4 --disk 40G --mem 8G
+    multipass stop $NODE_NAME
+    sleep 10
+    sudo vboxmanage modifyvm $NODE_NAME --nic2 hostonlynet --host-only-net2 "KubernetesNetwork"
+    sleep 10
+    multipass start $NODE_NAME
+done
+
+multipass list

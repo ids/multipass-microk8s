@@ -1,0 +1,5 @@
+sudo chown ubuntu /etc/hosts
+sudo cat k8s-hosts >> /etc/hosts
+
+sudo chown ubuntu /etc/cloud/templates/hosts.debian.tmpl
+sudo cat k8s-hosts >> /etc/cloud/templates/hosts.debian.tmpl

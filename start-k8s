@@ -1,0 +1,4 @@
+multipass start k8s-master
+multipass start k8s-node1
+multipass start k8s-node2
+multipass list

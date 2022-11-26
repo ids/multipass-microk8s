@@ -1,0 +1,15 @@
+source ./env
+
+echo -e "Deleting Master VM k8s-master:"
+multipass delete k8s-master 
+
+for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
+do 
+    NODE_NAME="k8s-node${w}"
+    echo -e "Deleting Worker VM ${NODE_NAME}:"
+    multipass delete $NODE_NAME
+done
+
+multipass purge
+multipass list
+
