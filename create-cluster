@@ -129,4 +129,5 @@ echo -e
 sleep 10
 
 kubectl --kubeconfig kube-config get nodes
+echo -e
 
