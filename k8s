@@ -1,0 +1,26 @@
+source ./env
+
+echo -e
+echo -e "--------------------"
+echo -e "[${1}] MicroK8s VMs"
+echo -e "--------------------"
+
+for ((w=1; w <= $MPM_K8S_MASTER_NODES; w++ ))
+do 
+    MASTER_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    echo -e ">> ${1} Master VM: ${MASTER_NAME}"
+    multipass ${1} $MASTER_NAME
+done
+
+for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
+do 
+    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
+    echo -e ">> ${1} Worker VM: ${NODE_NAME}"
+    multipass ${1} $NODE_NAME
+done
+
+sleep 10
+
+echo -e
+multipass list
+

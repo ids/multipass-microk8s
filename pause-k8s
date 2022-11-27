@@ -1,4 +1,0 @@
-multipass suspend k8s-master
-multipass suspend k8s-node1
-multipass suspend k8s-node2
-multipass list

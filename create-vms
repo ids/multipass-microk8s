@@ -8,20 +8,23 @@ echo -e
 sudo date
 echo -e
 
-echo -e "Creating Master VM k8s-master:"
-multipass launch --name k8s-master --network en0 --cpus 4 --disk 20G --mem 8G
-multipass stop k8s-master
-sleep 10
-sudo vboxmanage modifyvm "k8s-master" --nic2 hostonlynet --host-only-net2 "KubernetesNetwork"
-sleep 10
-multipass start k8s-master
-
+for ((w=1; w <= $MPM_K8S_MASTER_NODES; w++ ))
+do 
+    MASTER_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    echo -e ">> Creating Master VM: ${MASTER_NAME}:"
+    multipass launch --name $MASTER_NAME --network en0 --cpus 4 --disk 40G --mem 4G
+    multipass stop $MASTER_NAME
+    sleep 10
+    sudo vboxmanage modifyvm $MASTER_NAME --nic2 hostonlynet --host-only-net2 "KubernetesNetwork"
+    sleep 10
+    multipass start $MASTER_NAME
+done
 
 for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
 do 
-    NODE_NAME="k8s-node${w}"
-    echo -e "Creating Worker VM ${NODE_NAME}:"
-    multipass launch --name $NODE_NAME --network en0 --cpus 4 --disk 40G --mem 8G
+    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
+    echo -e ">> Creating Worker VM: ${NODE_NAME}:"
+    multipass launch --name $NODE_NAME --network en0 --cpus 4 --disk 40G --mem 4G
     multipass stop $NODE_NAME
     sleep 10
     sudo vboxmanage modifyvm $NODE_NAME --nic2 hostonlynet --host-only-net2 "KubernetesNetwork"
@@ -29,4 +32,9 @@ do
     multipass start $NODE_NAME
 done
 
+echo -e
+echo -e "-----------"
+echo -e "Cluster VMs"
+echo -e "-----------"
+echo -e
 multipass list

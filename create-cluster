@@ -10,24 +10,30 @@ echo -e "-------------------------"
 echo -e
 echo -e ">> Fetching the Master and Node IPs..."
 
-MI_IP=`multipass exec k8s-master -- ip addr | grep -A 3 ${MASTER_INTERNAL_NIC} | grep 'inet '`
+MI_IP=`multipass exec ${MPM_K8S_MASTER_NAME}1 -- ip addr | grep -A 3 ${MASTER_INTERNAL_NIC} | grep 'inet '`
 MI_IP=`echo ${MI_IP:9:13} | awk -v FS='\/' '{print $1}'`
 echo -e
-echo -e "Master internal ip: ${MI_IP}"
+echo -e "Master1 internal ip: ${MI_IP}"
 
-M_IP=`multipass exec k8s-master -- ip addr | grep -A 3 ${NODE_EXT_NIC} | grep 'inet '`
+rm k8s-hosts
+M_IP=`multipass exec ${MPM_K8S_MASTER_NAME}1 -- ip addr | grep -A 3 ${NODE_EXT_NIC} | grep 'inet '`
 M_IP=`echo ${M_IP:9:13} | awk -v FS='\/' '{print $1}'`
-#echo -e "${M_IP} k8s-master"
-echo -e "${M_IP} \tk8s-master" > k8s-hosts
 
-declare -a WorkerNodeIps
+for ((w=1; w <= $MPM_K8S_MASTER_NODES; w++ ))
+do 
+    MASTER_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    MASTER_IP=`multipass exec ${MASTER_NAME} -- ip addr | grep -A 3 ${NODE_EXT_NIC} | grep 'inet '`
+    MASTER_IP=`echo ${MASTER_IP:9:13} | awk -v FS='\/' '{print $1}'`
+    echo -e "${MASTER_IP} \t${MASTER_NAME}" >> k8s-hosts
+done
+
+
 for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
 do 
-    NODE_NAME="k8s-node${w}"
-    WorkerNodeIps[$w]=`multipass exec ${NODE_NAME} -- ip addr | grep -A 3 ${NODE_EXT_NIC} | grep 'inet '`
-    WorkerNodeIps[$w]=`echo ${WorkerNodeIps[$w]:9:13} | awk -v FS='\/' '{print $1}'`
-#    echo -e "${WorkerNodeIps[$w]} ${NODE_NAME}"
-    echo -e "${WorkerNodeIps[$w]} \t${NODE_NAME}" >> k8s-hosts
+    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
+    NODE_IP=`multipass exec ${NODE_NAME} -- ip addr | grep -A 3 ${NODE_EXT_NIC} | grep 'inet '`
+    NODE_IP=`echo ${NODE_IP:9:13} | awk -v FS='\/' '{print $1}'`
+    echo -e "${NODE_IP} \t${NODE_NAME}" >> k8s-hosts
 done
 
 echo -e
@@ -35,36 +41,41 @@ echo -e ">> /etc/hosts block for all Nodes:"
 cat k8s-hosts
 echo -e
 
-echo -e ">> Setting up Master /etc/hosts:"
-multipass transfer k8s-hosts k8s-master:/home/ubuntu
-multipass transfer _cat_etc k8s-master:/home/ubuntu
-multipass exec k8s-master -- sudo chmod +x _cat_etc  
-multipass exec k8s-master -- sudo bash _cat_etc
-#multipass exec k8s-master -- sudo cat /etc/hosts
-
-for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
+for ((w=1; w <= $MPM_K8S_MASTER_NODES; w++ ))
 do 
-    NODE_NAME="k8s-node${w}"
-    echo -e ">> Setting up ${NODE_NAME} /etc/hosts"
-    multipass transfer k8s-hosts ${NODE_NAME}:/home/ubuntu
-    multipass transfer _cat_etc ${NODE_NAME}:/home/ubuntu
-    multipass exec ${NODE_NAME} -- sudo chmod +x _cat_etc  
-    multipass exec ${NODE_NAME} -- sudo bash _cat_etc
-#    multipass exec ${NODE_NAME} -- sudo cat /etc/hosts
+    MASTER_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    echo -e ">> Setting up ${MASTER_NAME} /etc/hosts"
+    multipass transfer k8s-hosts ${MASTER_NAME}:/home/ubuntu
+    multipass transfer lib/_cat_etc ${MASTER_NAME}:/home/ubuntu
+    multipass exec ${MASTER_NAME} -- sudo chmod +x _cat_etc  
+    multipass exec ${MASTER_NAME} -- sudo bash _cat_etc
 done
 
-echo -e
-echo -e ">> Setting up the MicroK8s Master k8s-master:"
-multipass exec k8s-master -- sudo snap install microk8s --classic --channel=1.25
-multipass exec k8s-master -- sudo usermod -a -G microk8s ubuntu
-multipass exec k8s-master -- sudo chown -f -R ubuntu ~/.kube
-multipass exec k8s-master -- microk8s status --wait-ready
+for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
+do 
+    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
+    echo -e ">> Setting up ${NODE_NAME} /etc/hosts"
+    multipass transfer k8s-hosts ${NODE_NAME}:/home/ubuntu
+    multipass transfer lib/_cat_etc ${NODE_NAME}:/home/ubuntu
+    multipass exec ${NODE_NAME} -- sudo chmod +x _cat_etc  
+    multipass exec ${NODE_NAME} -- sudo bash _cat_etc
+done
+
+for ((w=1; w <= $MPM_K8S_MASTER_NODES; w++ ))
+do 
+    MASTER_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    echo -e
+    echo -e ">> Setting up MicroK8s on Master: ${MASTER_NAME}"
+    multipass exec ${MASTER_NAME} -- sudo snap install microk8s --classic --channel=1.25
+    multipass exec ${MASTER_NAME} -- sudo usermod -a -G microk8s ubuntu
+    multipass exec ${MASTER_NAME} -- sudo chown -f -R ubuntu ~/.kube
+done
 
 for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
 do 
-    NODE_NAME="k8s-node${w}"
+    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
     echo -e
-    echo -e ">> Setting up MicroK8s Worker ${NODE_NAME}:"
+    echo -e ">> Setting up MicroK8s on Worker: ${NODE_NAME}"
     multipass exec ${NODE_NAME} -- sudo snap install microk8s --classic --channel=1.25
     multipass exec ${NODE_NAME} -- sudo usermod -a -G microk8s ubuntu
     multipass exec ${NODE_NAME} -- sudo chown -f -R ubuntu ~/.kube
@@ -72,18 +83,34 @@ done
 
 echo -e
 echo -e ">> Fetching kube-config and starting cluster build:"
-KUBE_CONFIG=`multipass exec k8s-master -- sudo microk8s kubectl config view --raw`
+KUBE_CONFIG=`multipass exec ${MPM_K8S_MASTER_NAME}1 -- sudo microk8s kubectl config view --raw`
 echo -e "${KUBE_CONFIG//127.0.0.1/$M_IP}" > kube-config
+
+echo -e
+echo -e ">> Joining Master Nodes..."
+
+for ((w=2; w <= $MPM_K8S_MASTER_NODES; w++ ))
+do 
+    M_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    echo -e
+    echo -e ">> Joining Master: ${M_NAME}"
+    MJOIN_CMDR=`multipass exec ${MPM_K8S_MASTER_NAME}1 -- microk8s add-node | grep -e --worker$`
+    MJOIN_CMD=`echo -e "${MJOIN_CMDR//$MI_IP/$M_IP}"`
+    MJOIN_CMD=`echo -e "${MJOIN_CMD//--worker/ }"`
+    echo -e "${MJOIN_CMD}"
+    echo -e
+    multipass exec $M_NAME -- $MJOIN_CMD
+done
 
 echo -e
 echo -e ">> Joining Worker Nodes..."
 
 for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
 do 
-    NODE_NAME="k8s-node${w}"
+    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
     echo -e
-    echo -e ">> Worker ${NODE_NAME}:"
-    JOIN_CMDR=`multipass exec k8s-master -- microk8s add-node | grep -e --worker$`
+    echo -e ">> Joining Worker: ${NODE_NAME}"
+    JOIN_CMDR=`multipass exec ${MPM_K8S_MASTER_NAME}1 -- microk8s add-node | grep -e --worker$`
     JOIN_CMD=`echo -e "${JOIN_CMDR//$MI_IP/$M_IP}"`
     echo -e "${JOIN_CMD}"
     echo -e
@@ -91,7 +118,7 @@ do
 done
 
 echo -e
-echo -e ">> All Workers Joined"
+echo -e ">> All Workers Joined!"
 echo -e
 
 echo -e "--------------"

@@ -1,3 +1,4 @@
+#!/bin/bash
 
 vboxmanage hostonlynetwork add --network 192.168.42.0/24 --netname="KubernetesNetwork" --dhcp=on --ipv6=off
 vboxmanage hostonlynetwork list
