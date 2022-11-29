@@ -8,26 +8,26 @@ echo -e
 sudo date
 echo -e
 
-for ((w=1; w <= $MPM_K8S_MASTER_NODES; w++ ))
+for ((w=1; w <= $CB_MASTER_NODES; w++ ))
 do 
-    MASTER_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    MASTER_NAME="${CB_MASTER_NAME}${w}"
     echo -e ">> Creating Master VM: ${MASTER_NAME}:"
-    multipass launch --name $MASTER_NAME --network en0 --cpus 4 --disk 40G --mem 4G
+    multipass launch --name $MASTER_NAME --network en0 --cpus $CB_MASTER_CPU --disk $CB_MASTER_DISK --mem $CB_MASTER_RAM
     multipass stop $MASTER_NAME
     sleep 10
-    sudo vboxmanage modifyvm $MASTER_NAME --nic2 hostonlynet --host-only-net2 "KubernetesNetwork"
+    sudo vboxmanage modifyvm $MASTER_NAME --nic2 hostonlynet --host-only-net2 "${CB_NETWORK}"
     sleep 10
     multipass start $MASTER_NAME
 done
 
-for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
+for ((w=1; w <= $CB_WORKER_NODES; w++ ))
 do 
-    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
+    NODE_NAME="${CB_WORKER_NAME}${w}"
     echo -e ">> Creating Worker VM: ${NODE_NAME}:"
-    multipass launch --name $NODE_NAME --network en0 --cpus 4 --disk 40G --mem 4G
+    multipass launch --name $NODE_NAME --network en0 --cpus $CB_WORKER_CPU --disk $CB_WORKER_DISK --mem $CB_WORKER_RAM
     multipass stop $NODE_NAME
     sleep 10
-    sudo vboxmanage modifyvm $NODE_NAME --nic2 hostonlynet --host-only-net2 "KubernetesNetwork"
+    sudo vboxmanage modifyvm $NODE_NAME --nic2 hostonlynet --host-only-net2 "${CB_NETWORK}"
     sleep 10
     multipass start $NODE_NAME
 done

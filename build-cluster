@@ -10,27 +10,27 @@ echo -e "-------------------------"
 echo -e
 echo -e ">> Fetching the Master and Node IPs..."
 
-MI_IP=`multipass exec ${MPM_K8S_MASTER_NAME}1 -- ip addr | grep -A 3 ${MASTER_INTERNAL_NIC} | grep 'inet '`
+MI_IP=`multipass exec ${CB_MASTER_NAME}1 -- ip addr | grep -A 3 ${MASTER_INTERNAL_NIC} | grep 'inet '`
 MI_IP=`echo ${MI_IP:9:13} | awk -v FS='\/' '{print $1}'`
 echo -e
 echo -e "Master1 internal ip: ${MI_IP}"
 
 rm k8s-hosts
-M_IP=`multipass exec ${MPM_K8S_MASTER_NAME}1 -- ip addr | grep -A 3 ${NODE_EXT_NIC} | grep 'inet '`
+M_IP=`multipass exec ${CB_MASTER_NAME}1 -- ip addr | grep -A 3 ${NODE_EXT_NIC} | grep 'inet '`
 M_IP=`echo ${M_IP:9:13} | awk -v FS='\/' '{print $1}'`
 
-for ((w=1; w <= $MPM_K8S_MASTER_NODES; w++ ))
+for ((w=1; w <= $CB_MASTER_NODES; w++ ))
 do 
-    MASTER_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    MASTER_NAME="${CB_MASTER_NAME}${w}"
     MASTER_IP=`multipass exec ${MASTER_NAME} -- ip addr | grep -A 3 ${NODE_EXT_NIC} | grep 'inet '`
     MASTER_IP=`echo ${MASTER_IP:9:13} | awk -v FS='\/' '{print $1}'`
     echo -e "${MASTER_IP} \t${MASTER_NAME}" >> k8s-hosts
 done
 
 
-for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
+for ((w=1; w <= $CB_WORKER_NODES; w++ ))
 do 
-    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
+    NODE_NAME="${CB_WORKER_NAME}${w}"
     NODE_IP=`multipass exec ${NODE_NAME} -- ip addr | grep -A 3 ${NODE_EXT_NIC} | grep 'inet '`
     NODE_IP=`echo ${NODE_IP:9:13} | awk -v FS='\/' '{print $1}'`
     echo -e "${NODE_IP} \t${NODE_NAME}" >> k8s-hosts
@@ -41,9 +41,9 @@ echo -e ">> /etc/hosts block for all Nodes:"
 cat k8s-hosts
 echo -e
 
-for ((w=1; w <= $MPM_K8S_MASTER_NODES; w++ ))
+for ((w=1; w <= $CB_MASTER_NODES; w++ ))
 do 
-    MASTER_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    MASTER_NAME="${CB_MASTER_NAME}${w}"
     echo -e ">> Setting up ${MASTER_NAME} /etc/hosts"
     multipass transfer k8s-hosts ${MASTER_NAME}:/home/ubuntu
     multipass transfer lib/_cat_etc ${MASTER_NAME}:/home/ubuntu
@@ -51,9 +51,9 @@ do
     multipass exec ${MASTER_NAME} -- sudo bash _cat_etc
 done
 
-for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
+for ((w=1; w <= $CB_WORKER_NODES; w++ ))
 do 
-    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
+    NODE_NAME="${CB_WORKER_NAME}${w}"
     echo -e ">> Setting up ${NODE_NAME} /etc/hosts"
     multipass transfer k8s-hosts ${NODE_NAME}:/home/ubuntu
     multipass transfer lib/_cat_etc ${NODE_NAME}:/home/ubuntu
@@ -61,9 +61,9 @@ do
     multipass exec ${NODE_NAME} -- sudo bash _cat_etc
 done
 
-for ((w=1; w <= $MPM_K8S_MASTER_NODES; w++ ))
+for ((w=1; w <= $CB_MASTER_NODES; w++ ))
 do 
-    MASTER_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    MASTER_NAME="${CB_MASTER_NAME}${w}"
     echo -e
     echo -e ">> Setting up MicroK8s on Master: ${MASTER_NAME}"
     multipass exec ${MASTER_NAME} -- sudo snap install microk8s --classic --channel=1.25
@@ -71,9 +71,9 @@ do
     multipass exec ${MASTER_NAME} -- sudo chown -f -R ubuntu ~/.kube
 done
 
-for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
+for ((w=1; w <= $CB_WORKER_NODES; w++ ))
 do 
-    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
+    NODE_NAME="${CB_WORKER_NAME}${w}"
     echo -e
     echo -e ">> Setting up MicroK8s on Worker: ${NODE_NAME}"
     multipass exec ${NODE_NAME} -- sudo snap install microk8s --classic --channel=1.25
@@ -83,18 +83,18 @@ done
 
 echo -e
 echo -e ">> Fetching kube-config and starting cluster build:"
-KUBE_CONFIG=`multipass exec ${MPM_K8S_MASTER_NAME}1 -- sudo microk8s kubectl config view --raw`
+KUBE_CONFIG=`multipass exec ${CB_MASTER_NAME}1 -- sudo microk8s kubectl config view --raw`
 echo -e "${KUBE_CONFIG//127.0.0.1/$M_IP}" > kube-config
 
 echo -e
 echo -e ">> Joining Master Nodes..."
 
-for ((w=2; w <= $MPM_K8S_MASTER_NODES; w++ ))
+for ((w=2; w <= $CB_MASTER_NODES; w++ ))
 do 
-    M_NAME="${MPM_K8S_MASTER_NAME}${w}"
+    M_NAME="${CB_MASTER_NAME}${w}"
     echo -e
     echo -e ">> Joining Master: ${M_NAME}"
-    MJOIN_CMDR=`multipass exec ${MPM_K8S_MASTER_NAME}1 -- microk8s add-node | grep -e --worker$`
+    MJOIN_CMDR=`multipass exec ${CB_MASTER_NAME}1 -- microk8s add-node | grep -e --worker$`
     MJOIN_CMD=`echo -e "${MJOIN_CMDR//$MI_IP/$M_IP}"`
     MJOIN_CMD=`echo -e "${MJOIN_CMD//--worker/ }"`
     echo -e "${MJOIN_CMD}"
@@ -105,12 +105,12 @@ done
 echo -e
 echo -e ">> Joining Worker Nodes..."
 
-for ((w=1; w <= $MPM_K8S_WORKER_NODES; w++ ))
+for ((w=1; w <= $CB_WORKER_NODES; w++ ))
 do 
-    NODE_NAME="${MPM_K8S_WORKER_NAME}${w}"
+    NODE_NAME="${CB_WORKER_NAME}${w}"
     echo -e
     echo -e ">> Joining Worker: ${NODE_NAME}"
-    JOIN_CMDR=`multipass exec ${MPM_K8S_MASTER_NAME}1 -- microk8s add-node | grep -e --worker$`
+    JOIN_CMDR=`multipass exec ${CB_MASTER_NAME}1 -- microk8s add-node | grep -e --worker$`
     JOIN_CMD=`echo -e "${JOIN_CMDR//$MI_IP/$M_IP}"`
     echo -e "${JOIN_CMD}"
     echo -e
